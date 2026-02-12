@@ -7,7 +7,7 @@ A Python-based tool to automatically extract invoice data and export it to Excel
 ## 🚀 Download
 
 👉 Download the latest version here:
-https://github.com/thkminh/Invoice-Auto.../releases
+[https://github.com/thkminh/Invoice-Auto.../releases](https://github.com/tnkminh/Invoice-Automation-Yick-Shun/releases/tag/v1.0)
 
 ## ✨ Features
 
