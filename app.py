@@ -10,46 +10,90 @@ Original file is located at
 import streamlit as st
 import pdfplumber
 import pandas as pd
+import re
 import io
 
 st.set_page_config(page_title="Invoice Extractor", layout="centered")
 
 st.title("📄 Invoice Extractor")
-st.write("Upload your invoice PDF and download extracted Excel data.")
+st.write("Upload one or multiple invoice PDFs and download extracted data.")
 
-uploaded_file = st.file_uploader("Upload Invoice PDF", type=["pdf"])
+uploaded_files = st.file_uploader(
+    "Upload Invoice PDFs",
+    type=["pdf"],
+    accept_multiple_files=True
+)
 
-if uploaded_file is not None:
+if uploaded_files:
 
-    with pdfplumber.open(uploaded_file) as pdf:
-        text = ""
-        for page in pdf.pages:
-            text += page.extract_text()
+    all_data = []
 
-    # === YOUR EXTRACTION LOGIC HERE ===
-    # Example placeholder
-    invoice_number = "12345"
-    invoice_date = "2025-01-01"
+    for uploaded_file in uploaded_files:
 
-    data = {
-        "Invoice Number": [invoice_number],
-        "Invoice Date": [invoice_date],
-    }
+        invoice_number = uploaded_file.name.replace(".pdf", "")
+        rows = []
 
-    df = pd.DataFrame(data)
+        with pdfplumber.open(uploaded_file) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text()
+                if not text:
+                    continue
 
-    st.success("Extraction complete!")
+                lines = text.split("\n")
 
-    st.dataframe(df)
+                for line in lines:
+                    match = re.search(
+                        r'(.+?)\s+(\d+)\s+([A-Za-z]+)\s+([\d.]+)\s+([\d,]+\.\d+)$',
+                        line
+                    )
 
-    # Convert to Excel in memory
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False)
+                    if match:
+                        description = match.group(1).strip()
+                        quantity = match.group(2)
+                        unit = match.group(3)
+                        unit_price = match.group(4)
+                        amount = match.group(5)
 
-    st.download_button(
-        label="📥 Download Excel",
-        data=output.getvalue(),
-        file_name="invoice_result.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+                        rows.append([
+                            invoice_number,
+                            description,
+                            quantity,
+                            unit,
+                            unit_price,
+                            amount
+                        ])
+
+        if rows:
+            df_invoice = pd.DataFrame(
+                rows,
+                columns=[
+                    "Invoice",
+                    "Description",
+                    "Quantity",
+                    "Unit",
+                    "Unit Price",
+                    "Amount"
+                ]
+            )
+
+            all_data.append(df_invoice)
+
+    if all_data:
+        final_df = pd.concat(all_data, ignore_index=True)
+
+        st.success("✅ Extraction complete!")
+        st.dataframe(final_df)
+
+        # Download as Excel
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            final_df.to_excel(writer, index=False)
+
+        st.download_button(
+            label="📥 Download Excel",
+            data=output.getvalue(),
+            file_name="invoice_result.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    else:
+        st.warning("⚠ No table data detected.")
